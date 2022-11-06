@@ -1,0 +1,7 @@
+matplotlib
+numba
+opencv-python
+pandas
+scikit-learn
+scikit-image
+wisardpkg
