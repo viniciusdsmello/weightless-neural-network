@@ -25,5 +25,3 @@ COPY requirements.txt .
 
 # Install dependencies
 RUN pip install --upgrade -r requirements.txt
-
-COPY . /app/
