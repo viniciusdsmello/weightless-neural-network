@@ -20,4 +20,6 @@ singularity exec \
     -B $PWD/notebooks:/home/sonar/code/notebooks \
     -B $PWD/scripts:/home/sonar/code/scripts \
     weightless_neural_networks.sif \
-    python assignments/a1/train.py
+    python assignments/a1/train.py \
+    --agent \
+    --sweep_id $WANDB_SWEEP_ID
