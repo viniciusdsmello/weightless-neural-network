@@ -58,8 +58,8 @@ def train():
     with wandb.init(
         entity="viniciusdsmello",
         project="wnn",
-        config=config_defaults
     ) as run:
+        run.config.setdefaults(config_defaults)
         config = wandb.config
         # Load data
         X, X_test, y, y_test = load_data(DATASET_PATH)
@@ -109,6 +109,8 @@ def train():
 
                 durations.append(time.time() - start_time)
                 scores.append(test_acc)
+
+                del trainer
 
             wandb.log({"mean_trainnig_duration": np.mean(durations)})
             wandb.log({"str_trainnig_duration": np.std(durations)})

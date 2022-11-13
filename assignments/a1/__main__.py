@@ -5,6 +5,11 @@ from assignments.a1.train import train
 if __name__ == '__main__':
     sweep_config = {
         'method': 'grid',
+        'name': 'sweep',
+        'metric': {
+            'name': 'mean_val_acc',
+            'goal': 'maximize'
+        },
         'parameters': {
             'training_type': {
                 'values': ['kfold']
@@ -13,7 +18,7 @@ if __name__ == '__main__':
                 'values': ['basic_bin', 'simple_thermometer', 'circular_thermometer', 'sauvola', 'niblack', 'adaptive_thresh_mean', 'adaptive_thresh_gaussian']
             },
             'binarization_threshold': {
-                'values': [128, 64, 32, 16, 8]
+                'values': [128, 64, 32, 16, 8, 4, 2]
             },
             'binarization_resolution': {
                 'values': [20, 40, 60, 80, 100]
