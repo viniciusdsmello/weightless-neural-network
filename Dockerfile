@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.9-slim-buster
 
 # metainformation
 LABEL org.opencontainers.image.version = "0.0.0"
@@ -17,6 +17,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     ffmpeg \
     libsm6 \
     libxext6 \
+    libgl1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
