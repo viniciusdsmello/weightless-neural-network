@@ -1,6 +1,6 @@
 matplotlib
 numba
-opencv-python
+opencv-python-headless
 pandas
 scikit-learn
 scikit-image
