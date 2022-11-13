@@ -4,4 +4,5 @@ opencv-python
 pandas
 scikit-learn
 scikit-image
+pybind11
 wisardpkg
