@@ -14,6 +14,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     build-essential \
     gcc \
     git \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
