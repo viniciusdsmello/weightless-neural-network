@@ -1,6 +1,7 @@
 """
 In this module we define the model architecture and all the training steps.
 """
+import gc
 import time
 import logging
 import os
@@ -8,7 +9,7 @@ import numpy as np
 import wandb
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from utils import load_data, Binarizer
+from utils import load_data, Binarizer, plot_confusion_matrix, display_digits
 from model_trainer import ModelTrainer
 
 try:
@@ -44,7 +45,7 @@ def train():
         "wsd_address_size": 20,
         # RAMs ignores the address 0
         "wsd_ignore_zero": False,
-        "wsd_verbose": True,
+        "wsd_verbose": False,
         "wsd_bleaching_activated": True,
         # when M (number of bits) is not divisible by n_i
         "wsd_complete_addressing": True,
@@ -88,6 +89,7 @@ def train():
             kf = StratifiedKFold(n_splits=folds, shuffle=True, random_state=config["random_seed"])
 
             scores = []
+            scores_train = []
             durations = []
             for fold, (index_X_train, index_X_val) in enumerate(kf.split(X, y)):
                 logging.info(f"Training Fold {fold + 1}/{folds}")
@@ -105,18 +107,29 @@ def train():
 
                 start_time = time.time()
                 trainer.train(X_train, y_train)
-                test_acc: float = trainer.evaluate(X_val, y_val)
-
                 durations.append(time.time() - start_time)
-                scores.append(test_acc)
 
+                test_acc: float = trainer.evaluate(X_val, y_val)
+                train_acc: float = trainer.evaluate(X_train, y_train)
+                scores.append(test_acc)
+                scores_train.append(train_acc)
+
+                del trainer.model
                 del trainer
+                del X_train
+                del X_val
+                del y_train
+                del y_val
+                gc.collect()
 
             wandb.log({"mean_trainnig_duration": np.mean(durations)})
-            wandb.log({"str_trainnig_duration": np.std(durations)})
+            wandb.log({"std_trainnig_duration": np.std(durations)})
+
+            wandb.log({"mean_train_acc": np.mean(scores_train)})
+            wandb.log({"std_train_acc": np.std(scores_train)})
 
             wandb.log({"mean_val_acc": np.mean(scores)})
-            wandb.log({"str_val_acc": np.std(scores)})
+            wandb.log({"std_val_acc": np.std(scores)})
         elif config['training_type'] == 'validation_split':
             logging.info("Training with validation split")
             X_train, X_val, y_train, y_val = train_test_split(
@@ -154,6 +167,25 @@ def train():
         wandb.log({"train_acc": train_acc})
         wandb.log({"test_acc": test_acc})
 
+        plot_confusion_matrix(
+            y_true=y,
+            y_pred=trainer.predict(X),
+            name='Training set',
+            experiment=wandb,
+            labels=sorted(set(y))
+        )
+
+        plot_confusion_matrix(
+            y_true=y_test,
+            y_pred=trainer.predict(X_test),
+            name='Test set',
+            experiment=wandb,
+            labels=sorted(set(y_test))
+        )
+        try:
+            display_digits(trainer.model.getMentalImages(), wandb)
+        except:
+            logging.exception("Error displaying mental images")
 
 if __name__ == '__main__':
     try:
