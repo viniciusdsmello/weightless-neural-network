@@ -19,7 +19,7 @@ def main():
     # Check if the argument sweep is True
     if args.sweep:
         sweep_config = {
-            'method': 'grid',
+            'method': 'bayes',
             'name': 'sweep',
             'metric': {
                 'name': 'mean_val_acc',
@@ -30,27 +30,52 @@ def main():
                     'values': ['kfold']
                 },
                 'binarization_strategy': {
-                    'values': ['basic_bin', 'simple_thermometer', 'circular_thermometer', 'sauvola', 'niblack', 'adaptive_thresh_mean', 'adaptive_thresh_gaussian']
+                    'values': [
+                        # 'basic_bin',
+                        'simple_thermometer',
+                        # 'circular_thermometer',
+                        # 'sauvola',
+                        # 'niblack',
+                        # 'adaptive_thresh_mean',
+                        # 'adaptive_thresh_gaussian'
+                    ]
                 },
                 'binarization_threshold': {
-                    'values': [128, 64, 32, 16, 8, 4, 2]
+                    'values': [None]
                 },
                 'binarization_resolution': {
-                    'values': [20, 40, 60, 80, 100]
+                    'values': [
+                        20,
+                        40,
+                        50,
+                        60,
+                        70,
+                        80,
+                        90,
+                        100,
+                        110,
+                        120,
+                        130,
+                        140,
+                        150
+                    ]
                 },
                 'binarization_window_size': {
-                    'values': [3, 5, 7, 9, 11]
+                    'values': [None]
                 },
                 'binarization_constant_c': {
-                    'values': [2, 4, 6, 8, 10]
+                    'values': [None]
                 },
-                'binarizaton_constant_k': {
-                    'values': [0.2, 0.4, 0.6, 0.8, 1.0]
+                'binarization_constant_k': {
+                    'values': [None]
                 },
                 'wsd_address_size': {
-                    'values': [2, 4, 8, 16, 32, 64, 128, 256]
+                    'values': [24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48]
                 },
                 'wsd_ignore_zero': {
+                    'values': [False]
+                },
+                'wsd_bleaching_activated': {
                     'values': [True, False]
                 },
             }
@@ -63,7 +88,7 @@ def main():
         print("Sweep ID: ", sweep_id)
     if args.agent and args.sweep_id:
         # Run the agent
-        wandb.agent(args.sweep_id, function=train)
+        wandb.agent(args.sweep_id, entity='viniciusdsmello', project='wnn', function=train)
 
 
 if __name__ == '__main__':
