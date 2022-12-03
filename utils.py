@@ -1,12 +1,19 @@
 """
 In this module auxiliary functions are defined for the main module.
 """
+import logging
 import os
-from encoders import ThermometerEncoder, CircularThermometerEncoder
+from typing import Any, List
 
 import cv2 as cv
+import matplotlib.pyplot as plt
 import numpy as np
 from skimage.filters import threshold_niblack, threshold_sauvola
+from sklearn.metrics import confusion_matrix
+
+from encoders import CircularThermometerEncoder, ThermometerEncoder
+
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 
 def load_data(dataset_path: str) -> tuple:
@@ -117,3 +124,56 @@ class Binarizer():
 
     def adaptive_thresh_gaussian(self, arr: np.ndarray, window_size: int = 11, constant_c: int = 2) -> list:
         return [cv.adaptiveThreshold(x, 1, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, window_size, constant_c).flatten() for x in arr]
+
+def plot_confusion_matrix(y_true, y_pred, name: str, experiment: Any, labels: List[str] = ['A', 'B', 'C', 'D']):
+    plt.rcParams['xtick.labelsize'] = 15
+    plt.rcParams['ytick.labelsize'] = 15
+
+    plt.rc('legend', **{'fontsize': 15})
+
+    fig = plt.figure(figsize=(15, 9))
+    ax = fig.add_subplot(111)
+    ax.set_aspect(1)
+
+    cm = confusion_matrix(y_true, y_pred)
+    cm_normalized = 100. * cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    im = ax.imshow(cm_normalized, interpolation='nearest', cmap=plt.cm.Greys, clim=(0.0, 100.0))
+
+    width, height = cm_normalized.shape
+
+    for x in range(width):
+        for y in range(height):
+            if cm_normalized[x][y] < 50.:
+                ax.annotate('%1.2f%%' % (cm_normalized[x][y]), xy=(y, x),
+                            horizontalalignment='center',
+                            verticalalignment='center')
+            else:
+                ax.annotate('%1.2f%%' % (cm_normalized[x][y]), xy=(y, x),
+                            horizontalalignment='center',
+                            verticalalignment='center', color='white')
+
+    ax.set_title(f'Confusion Matrix - {name}', fontweight='bold', fontsize=15)
+    fig.colorbar(im)
+    tick_marks = np.arange(len(labels))
+    ax.xaxis.set_ticks(tick_marks)
+    ax.xaxis.set_ticklabels(labels)
+
+    ax.yaxis.set_ticks(tick_marks)
+    ax.yaxis.set_ticklabels(labels)
+
+    ax.set_ylabel('True Label', fontweight='bold', fontsize=15)
+    ax.set_xlabel('Predicted Label', fontweight='bold', fontsize=15)
+
+    experiment.log({f"confusion_matrix_{name}": plt})
+
+def display_digits(images: dict, experiment: Any):
+  fig, axs = plt.subplots(2, 5, squeeze=True)
+
+  for i, img in enumerate(images.values()):
+    img = np.reshape(img, (28, 28))
+    img = img/np.max(img)
+    fig.axes[i].imshow(img, cmap="gray", vmin=0., vmax=1.)
+    fig.axes[i].xaxis.set_visible(False)
+    fig.axes[i].yaxis.set_visible(False)
+
+    experiment.log({f"mental_images": plt})
