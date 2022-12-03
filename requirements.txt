@@ -4,5 +4,5 @@ opencv-python-headless
 pandas
 scikit-learn
 scikit-image
-pybind11
-wisardpkg
+pybind11==2.10.1
+wisardpkg==2.0.0a7

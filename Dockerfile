@@ -9,21 +9,21 @@ LABEL org.opencontainers.image.licenses = "MIT"
 RUN apt-get update && apt-get upgrade -y && apt-get clean
 
 # Essential Installs
-RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
-    && apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
+    g++ \ 
     git \
     ffmpeg \
     libsm6 \
     libxext6 \
     libgl1 \
+    python3-opencv \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
 # Set the working directory
 WORKDIR /app
-ENV PYTHONPATH /app
 
 COPY requirements.txt .
 
