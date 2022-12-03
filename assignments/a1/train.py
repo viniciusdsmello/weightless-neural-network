@@ -63,7 +63,7 @@ def train():
         run.config.setdefaults(config_defaults)
         config = wandb.config
         # Load data
-        X, X_test, y, y_test = load_data(DATASET_PATH)
+        X, X_test, y, y_test = load_data(os.path.join(DATASET_PATH, 'kmnist'))
 
         logging.info("X shape: %s", X.shape)
         logging.info("y shape: %s", len(y))

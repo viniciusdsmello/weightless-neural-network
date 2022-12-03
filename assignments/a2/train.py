@@ -11,10 +11,10 @@ from poseidon.io.offline import load_raw_data
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 import wandb
-from assignments.a2.utils import (generate_train_test_dataset,
-                                  preprocess_rawdata, sp_index)
+from assignments.a2.sonar_utils import (generate_train_test_dataset,
+                                        preprocess_rawdata, sp_index, SonarBinarizer)
 from model_trainer import ModelTrainer
-from utils import Binarizer, display_digits, load_data, plot_confusion_matrix
+from utils import plot_confusion_matrix
 
 try:
     from dotenv import load_dotenv
@@ -30,7 +30,7 @@ DATASET_CONFIG = {
     "preprocessing_decimation_rate": 3,
     "preprocessing_lofar_nfft": 1024,
     "preprocessing_lofar_noverlap": False,
-    "preprocessing_lofar_spectrum_bins_left": 400,
+    "preprocessing_lofar_spectrum_bins_left": 200,
     "preprocessing_filter_type": "fir",
     "preprocessing_filter_phase": False,
     "runs_distribution": {
@@ -54,18 +54,18 @@ def train():
     This function is called by the wandb agent and contains the training loop.
     """
     config_defaults = {
-        "training_type": "kfold",
+        "training_type": "validation_split",
         "random_seed": 8080,
         "validation_split": 0.2,
         "folds": 5,
         "binarization_strategy": "basic_bin",
-        "binarization_threshold": None,
+        "binarization_threshold": None, # If None, the threshold is computed using the mean value of each sample
         "binarization_resolution": 20,
         "binarization_window_size": 3,
         "binarization_constant_c": 2,
         "binarization_constant_k": 0.2,
         # Number of RAM addressing bits
-        "wsd_address_size": 20,
+        "wsd_address_size": 5,
         # RAMs ignores the address 0
         "wsd_ignore_zero": False,
         "wsd_verbose": False,
@@ -82,41 +82,49 @@ def train():
     config_defaults.update(DATASET_CONFIG)
     with wandb.init(
         entity="viniciusdsmello",
-        project="wnn-sonar",
+        project="wnn-sonar"
     ) as run:
         run.config.setdefaults(config_defaults)
         config = wandb.config
 
         # Load data
-        X, X_test, y, y_test = load_data(DATASET_PATH)
         raw_data_path = os.path.join(DATASET_PATH, config['dataset'])
         raw_data = load_raw_data(raw_data_path, verbose=1)
         preprocessed_data = preprocess_rawdata(raw_data, config)
+        logging.info("Splitting data into train and test sets...")
         development_set, test_set = generate_train_test_dataset(
-                sonar_data=preprocessed_data,
-                trgt_label_map={'Class1': 0, 'Class2': 1, 'Class3': 2, 'Class4': 3},
-                concatenate_runs=True,
-                runs_distribution=config['runs_distribution']
-            )
+            sonar_data=preprocessed_data,
+            trgt_label_map={'Class1': 0, 'Class2': 1, 'Class3': 2, 'Class4': 3},
+            concatenate_runs=True,
+            runs_distribution=config['runs_distribution']
+        )
         X, y = development_set
         X_test, y_test = test_set
+
+        y = y.astype(int)
+        y_test = y_test.astype(int)
 
         logging.info("X shape: %s", X.shape)
         logging.info("y shape: %s", len(y))
         logging.info("X_test shape: %s", X_test.shape)
         logging.info("y_test shape: %s", len(y_test))
 
+
         # Binaryize data
-        binarizer = Binarizer(
-            strategy=config['binarization_strategy'],
-            threshold=config['binarization_threshold'],
-            resolution=config['binarization_resolution'],
-            window_size=config['binarization_window_size'],
-            constant_c=config['binarization_constant_c'],
-            constant_k=config['binarization_constant_k']
-        )
-        X = binarizer.transform(X)
-        X_test = binarizer.transform(X_test)
+        try:
+            binarizer = SonarBinarizer(
+                strategy=config['binarization_strategy'],
+                threshold=config['binarization_threshold'],
+                resolution=config['binarization_resolution'],
+                window_size=config['binarization_window_size'],
+                constant_c=config['binarization_constant_c'],
+                constant_k=config['binarization_constant_k']
+            )
+            X = binarizer.transform(X)
+            X_test = binarizer.transform(X_test)
+        except Exception:
+            logging.exception("Failed to binarize the data")
+            raise
 
         if config['training_type'] == 'kfold':
             logging.info("Training with k-fold cross validation.")
@@ -200,8 +208,12 @@ def train():
 
         # Train with whole training set
         logging.info("Training with whole training set")
-        trainer = ModelTrainer(config)
-        trainer.train(X, y)
+        try:
+            trainer = ModelTrainer(config)
+            trainer.train(X, y)
+        except Exception:
+            logging.exception("Failed to train model")
+            raise
         train_acc: float = trainer.evaluate(X, y)
         test_acc: float = trainer.evaluate(X_test, y_test)
         train_sp_index: float = sp_index(y_train, trainer.predict(X_train))
@@ -234,6 +246,7 @@ def train():
             display_digits(trainer.model.getMentalImages(), wandb)
         except:
             logging.exception("Error displaying mental images")
+
 
 if __name__ == '__main__':
     try:
