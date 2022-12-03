@@ -133,3 +133,5 @@ dmypy.json
 .pyre/
 
 wandb/
+
+data/4classes/
