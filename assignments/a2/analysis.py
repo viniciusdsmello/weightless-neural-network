@@ -1,7 +1,6 @@
 """
 In this module we define the model architecture and all the training steps.
 """
-import gc
 import time
 import logging
 import os
@@ -9,7 +8,7 @@ import numpy as np
 import wandb
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from utils import load_data, Binarizer, plot_confusion_matrix, display_digits
+from utils import load_data, Binarizer, plot_confusion_matrix
 from model_trainer import ModelTrainer
 
 try:
@@ -31,30 +30,24 @@ def train():
     This function is called by the wandb agent and contains the training loop.
     """
     config_defaults = {
-        "training_type": "kfold",
-        "random_seed": 8080,
-        "validation_split": 0.2,
         "folds": 10,
-        "binarization_strategy": "basic_bin",
-        "binarization_threshold": 128,
-        "binarization_resolution": 20,
-        "binarization_window_size": 3,
-        "binarization_constant_c": 2,
-        "binarization_constant_k": 0.2,
-        # Number of RAM addressing bits
-        "wsd_address_size": 20,
-        # RAMs ignores the address 0
-        "wsd_ignore_zero": False,
+        "random_seed": 8080,
         "wsd_verbose": False,
+        "training_type": "validation_split",
+        "wsd_ignore_zero": False,
+        "validation_split": 0.2,
+        "wsd_address_size": 32,
+        "binarization_strategy": "simple_thermometer",
+        "binarization_resolution": 80,
+        "binarization_threshold": 16,
+        "binarization_constant_c": 8,
+        "binarization_constant_k": 1,
+        "binarization_window_size": 7,
         "wsd_bleaching_activated": True,
-        # when M (number of bits) is not divisible by n_i
         "wsd_complete_addressing": True,
-        # returns the degree of similarity of each y
+        "wsd_return_classes_degrees": False,
         "wsd_return_activation_degree": False,
-        # returns the confidence level of each y
         "wsd_return_confidence": False,
-        # confidence of each y in relation to each class
-        "wsd_return_classes_degrees": False
     }
     with wandb.init(
         entity="viniciusdsmello",
@@ -114,13 +107,7 @@ def train():
                 scores.append(test_acc)
                 scores_train.append(train_acc)
 
-                del trainer.model
                 del trainer
-                del X_train
-                del X_val
-                del y_train
-                del y_val
-                gc.collect()
 
             wandb.log({"mean_trainnig_duration": np.mean(durations)})
             wandb.log({"std_trainnig_duration": np.std(durations)})
@@ -162,11 +149,7 @@ def train():
         trainer.train(X, y)
         train_acc: float = trainer.evaluate(X, y)
         test_acc: float = trainer.evaluate(X_test, y_test)
-        logging.info(f"Train Accuracy: {train_acc}")
-        logging.info(f"Test Accuracy: {test_acc}")
-        wandb.log({"train_acc": train_acc})
-        wandb.log({"test_acc": test_acc})
-
+                   
         plot_confusion_matrix(
             y_true=y,
             y_pred=trainer.predict(X),
@@ -182,10 +165,12 @@ def train():
             experiment=wandb,
             labels=sorted(set(y_test))
         )
-        try:
-            display_digits(trainer.model.getMentalImages(), wandb)
-        except:
-            logging.exception("Error displaying mental images")
+
+        logging.info(f"Train Accuracy: {train_acc}")
+        logging.info(f"Test Accuracy: {test_acc}")
+        wandb.log({"train_acc": train_acc})
+        wandb.log({"test_acc": test_acc})
+
 
 if __name__ == '__main__':
     try:
