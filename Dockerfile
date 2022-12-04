@@ -14,14 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \ 
     git \
-    gfortran \
-    libopenblas-dev \
     ffmpeg \
     libsm6 \
     libxext6 \
     libgl1 \
     python3-opencv \
     libsndfile1 \
+    libsndfile1-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
