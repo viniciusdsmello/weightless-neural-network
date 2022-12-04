@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \ 
     git \
+    gfortran \
+    libopenblas-dev \
     ffmpeg \
     libsm6 \
     libxext6 \
