@@ -7,7 +7,7 @@
 #SBATCH --account=vinicius.mello  # account name
 
 
-cd $HOME/Workspace/Projects/weightless-neural-networks
+cd $HOME/Workspace/Projects/weightless-neural-network
 
 singularity exec \
     --env-file $PWD/.env \
