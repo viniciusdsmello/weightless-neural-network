@@ -1,6 +1,7 @@
 """
 In this module we define the model architecture and all the training steps.
 """
+import math
 import gc
 import logging
 import os
@@ -12,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 
 import wandb
 from assignments.a2.sonar_utils import (generate_train_test_dataset,
-                                        preprocess_rawdata, sp_index, SonarBinarizer)
+                                        preprocess_rawdata, sp_index, SonarBinarizer, scale_data)
 from model_trainer import ModelTrainer
 from utils import plot_confusion_matrix
 
@@ -30,7 +31,7 @@ DATASET_CONFIG = {
     "preprocessing_decimation_rate": 3,
     "preprocessing_lofar_nfft": 1024,
     "preprocessing_lofar_noverlap": False,
-    "preprocessing_lofar_spectrum_bins_left": 200,
+    "preprocessing_lofar_spectrum_bins_left": 400,
     "preprocessing_filter_type": "fir",
     "preprocessing_filter_phase": False,
     "runs_distribution": {
@@ -58,14 +59,13 @@ def train():
         "random_seed": 8080,
         "validation_split": 0.2,
         "folds": 5,
-        "binarization_strategy": "basic_bin",
+        "data_normalization": "mapstd",
+        "binarization_strategy": "circular_thermometer",
         "binarization_threshold": None, # If None, the threshold is computed using the mean value of each sample
         "binarization_resolution": 20,
-        "binarization_window_size": 3,
-        "binarization_constant_c": 2,
-        "binarization_constant_k": 0.2,
+        "binarization_window_size": 10,
         # Number of RAM addressing bits
-        "wsd_address_size": 5,
+        "wsd_address_size": 20,
         # RAMs ignores the address 0
         "wsd_ignore_zero": False,
         "wsd_verbose": False,
@@ -101,14 +101,18 @@ def train():
             X, y = development_set
             X_test, y_test = test_set
 
-            y = y.astype(int)
-            y_test = y_test.astype(int)
+            # We need to convert the target variables to str due to a limitation of the WNN implementation
+            y = y.astype(int).astype(str)
+            y_test = y_test.astype(int).astype(str)
 
             logging.info("X shape: %s", X.shape)
             logging.info("y shape: %s", len(y))
             logging.info("X_test shape: %s", X_test.shape)
             logging.info("y_test shape: %s", len(y_test))
 
+            # Scale data
+            
+            X, X_test = scale_data(X, X_test, config['data_normalization'])
 
             # Binaryize data
             try:
@@ -117,11 +121,14 @@ def train():
                     threshold=config['binarization_threshold'],
                     resolution=config['binarization_resolution'],
                     window_size=config['binarization_window_size'],
-                    constant_c=config['binarization_constant_c'],
-                    constant_k=config['binarization_constant_k']
+                    minimum=math.ceil(X.min()),
+                    maximum=math.floor(X.max())
                 )
                 X = binarizer.transform(X)
                 X_test = binarizer.transform(X_test)
+        
+                logging.info("X shape after binarization: %s", np.array(X).shape)
+                logging.info("X_test shape after binarization: %s", np.array(X_test).shape)
             except Exception:
                 logging.exception("Failed to binarize the data")
                 raise
@@ -132,9 +139,14 @@ def train():
                 folds = config["folds"]
                 kf = StratifiedKFold(n_splits=folds, shuffle=True, random_state=config["random_seed"])
 
-                scores = []
-                scores_train = []
+                train_acc_scores = []
+                val_acc_scores = []
+
+                train_spindex_scores = []
+                val_spindex_scores = []
+
                 durations = []
+                evaluation_durations = []
                 for fold, (index_X_train, index_X_val) in enumerate(kf.split(X, y)):
                     logging.info(f"Training Fold {fold + 1}/{folds}")
 
@@ -153,10 +165,20 @@ def train():
                     trainer.train(X_train, y_train)
                     durations.append(time.time() - start_time)
 
-                    test_acc: float = trainer.evaluate(X_val, y_val)
+                    start_time = time.time()
+                    val_acc: float = trainer.evaluate(X_val, y_val)
                     train_acc: float = trainer.evaluate(X_train, y_train)
-                    scores.append(test_acc)
-                    scores_train.append(train_acc)
+                    
+                    train_sp_index: float = sp_index(y_train, trainer.predict(X_train), method=None)
+                    val_sp_index: float = sp_index(y_val, trainer.predict(X_val), method=None)
+
+                    evaluation_durations.append(time.time() - start_time)
+
+                    train_acc_scores.append(train_acc)
+                    val_acc_scores.append(val_acc)
+
+                    train_spindex_scores.append(train_sp_index)
+                    val_spindex_scores.append(val_sp_index)
 
                     del trainer.model
                     del trainer
@@ -166,14 +188,23 @@ def train():
                     del y_val
                     gc.collect()
 
-                wandb.log({"mean_trainnig_duration": np.mean(durations)})
-                wandb.log({"std_trainnig_duration": np.std(durations)})
+                run.log({"mean_evaluation_duration": np.mean(evaluation_durations)})
+                run.log({"std_evaluation_duration": np.std(evaluation_durations)})
 
-                wandb.log({"mean_train_acc": np.mean(scores_train)})
-                wandb.log({"std_train_acc": np.std(scores_train)})
+                run.log({"mean_training_duration": np.mean(durations)})
+                run.log({"std_training_duration": np.std(durations)})
 
-                wandb.log({"mean_val_acc": np.mean(scores)})
-                wandb.log({"std_val_acc": np.std(scores)})
+                run.log({"mean_train_acc": np.mean(train_acc_scores)})
+                run.log({"std_train_acc": np.std(train_acc_scores)})
+                run.log({"mean_val_acc": np.mean(val_acc_scores)})
+                run.log({"std_val_acc": np.std(val_acc_scores)})
+
+                run.log({"mean_train_sp_index": np.mean(train_spindex_scores)})
+                run.log({"std_train_sp_index": np.std(train_spindex_scores)})
+
+                run.log({"mean_val_sp_index": np.mean(val_spindex_scores)})
+                run.log({"std_val_sp_index": np.std(val_spindex_scores)})
+
             elif config['training_type'] == 'validation_split':
                 logging.info("Training with validation split")
                 X_train, X_val, y_train, y_val = train_test_split(
@@ -183,49 +214,57 @@ def train():
                     random_state=config["random_seed"]
                 )
                 logging.info("Launching training")
-                start_time = time.time()
                 trainer = ModelTrainer(config)
+                start_time = time.time()
                 trainer.train(X_train, y_train)
                 logging.info("Training finished")
                 training_duration = time.time() - start_time
                 logging.info(f"Training time: {training_duration}")
-                wandb.log({"training_duration": training_duration})
+                run.log({"training_duration": training_duration})
+
                 logging.info("Evaluating model")
+                start_time = time.time()
                 train_acc: float = trainer.evaluate(X_train, y_train)
                 val_acc: float = trainer.evaluate(X_val, y_val)
-                train_sp_index: float = sp_index(y_train, trainer.predict(X_train))
-                val_sp_index: float = sp_index(y_val, trainer.predict(X_val))
+                evaluation_duration = time.time() - start_time
+                logging.info(f"Evaluation time: {evaluation_duration}")
+                run.log({"evaluation_duration": evaluation_duration})
+
+                train_sp_index: float = sp_index(y_train, trainer.predict(X_train), method=None)
+                val_sp_index: float = sp_index(y_val, trainer.predict(X_val), method=None)
 
                 logging.info(f"Train Accuracy: {train_acc}")
-                logging.info(f"Validation Accuracy: {test_acc}")
+                logging.info(f"Validation Accuracy: {val_acc}")
                 logging.info(f"Train SP Index: {train_sp_index}")
                 logging.info(f"Validation SP Index: {val_sp_index}")
 
-                wandb.log({"train_acc": train_acc})
-                wandb.log({"val_acc": val_acc})
-                wandb.log({"train_sp_index": train_sp_index})
-                wandb.log({"val_sp_index": val_sp_index})
+                run.log({"train_acc": train_acc})
+                run.log({"val_acc": val_acc})
+                run.log({"train_sp_index": train_sp_index})
+                run.log({"val_sp_index": val_sp_index})
 
             # Train with whole training set
             logging.info("Training with whole training set")
             try:
                 trainer = ModelTrainer(config)
-                trainer.train(X[:200, :].tolist(), y[:200].tolist())
+                trainer.train(X, y)
             except Exception:
                 logging.exception("Failed to train model")
                 raise
             train_acc: float = trainer.evaluate(X, y)
             test_acc: float = trainer.evaluate(X_test, y_test)
-            train_sp_index: float = sp_index(y_train, trainer.predict(X_train))
-            test_sp_index: float = sp_index(y_test, trainer.predict(X_test))
+            train_sp_index: float = sp_index(y, trainer.predict(X), method=None)
+            test_sp_index: float = sp_index(y_test, trainer.predict(X_test), method=None)
+
             logging.info(f"Train Accuracy: {train_acc}")
             logging.info(f"Test Accuracy: {test_acc}")
-            wandb.log({"train_acc": train_acc})
-            wandb.log({"test_acc": test_acc})
             logging.info(f"Train SP Index: {train_sp_index}")
             logging.info(f"Test SP Index: {test_sp_index}")
-            wandb.log({"train_sp_index": train_sp_index})
-            wandb.log({"test_sp_index": test_sp_index})
+
+            run.log({"train_acc": train_acc})
+            run.log({"test_acc": test_acc})
+            run.log({"train_sp_index": train_sp_index})
+            run.log({"test_sp_index": test_sp_index})
 
             plot_confusion_matrix(
                 y_true=y,
@@ -242,13 +281,8 @@ def train():
                 experiment=wandb,
                 labels=sorted(set(y_test))
             )
-            try:
-                display_digits(trainer.model.getMentalImages(), wandb)
-            except:
-                logging.exception("Error displaying mental images")
         except Exception:
             logging.exception("Error during training")
-            run.close()
             raise
 
 

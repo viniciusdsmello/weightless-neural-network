@@ -5,55 +5,75 @@ from typing import Dict, Tuple, Union
 
 import cv2 as cv
 import numpy as np
+import pandas as pd
 from poseidon.io.offline import SonarDict
 from poseidon.signal.passivesonar import lofar
 from scipy.signal import decimate
-from skimage.filters import threshold_niblack, threshold_sauvola
+from sklearn import preprocessing
 from sklearn.metrics import recall_score
 
 from encoders import CircularThermometerEncoder, ThermometerEncoder
 from utils import Binarizer
 
 
+def scale_data(train_data: pd.DataFrame, test_data: pd.DataFrame, scaler: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Function that applies a scaler to the data. The scaler can be either ´[minmax, standard, robust]´.
+    The scalers is first fitted to the training data and then applied to both the training and test data.
+    Args:
+        train_data (pd.DataFrame): Training data.
+        test_data (pd.DataFrame): Test data.
+        scaler (str): Scaler to be applied.
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: Scaled training and test data.
+    """
+    obj_std = None
+    if scaler == 'mapstd':
+        obj_std = preprocessing.StandardScaler().fit(train_data)
+    elif scaler == 'mapstd_rob':
+        obj_std = preprocessing.RobustScaler().fit(train_data)
+    elif scaler == 'mapminmax':
+        obj_std = preprocessing.MinMaxScaler().fit(train_data)
+    else:
+        return train_data, test_data
+
+    train_data_scaled = obj_std.transform(train_data)
+    test_data_scaled = obj_std.transform(test_data)
+    
+    return train_data_scaled, test_data_scaled
+
 class SonarBinarizer(Binarizer):
+    """
+    Implement binarization strategies.
+
+    Implemented strategies:
+        - basic_bin
+        - simple_thermometer
+        - circular_thermometer
+    """
     def __init__(
-        self, strategy: str, threshold: int, resolution: int, window_size: int, constant_k: float,
-            constant_c: float):
-        super().__init__(strategy, threshold, resolution, window_size, constant_k, constant_c)
+        self,
+        strategy: str,
+        threshold: int,
+        resolution: int,
+        window_size: int,
+        minimum: int,
+        maximum: int
+    ):
+        super().__init__(strategy, threshold, resolution, window_size, None, None)
+        self.minimum = minimum
+        self.maximum = maximum
 
     def basic_bin(self, arr: np.ndarray, threshold: int = None) -> list:
         _threshold = lambda x: threshold if threshold else np.mean(x)
         return [list(np.where(x < _threshold(x), 0, 1)) for x in arr]
 
-    def simple_thermometer(self, arr: np.ndarray, minimum: int = 0, maximum: int = 255, resolution: int = 25) -> list:
-        therm = ThermometerEncoder(maximum=maximum, minimum=minimum, resolution=resolution)
-        return [np.uint8(therm.encode(x)) for x in arr]
+    def simple_thermometer(self, arr: np.ndarray, minimum: int = 0, maximum: int = 8, resolution: int = 25) -> list:
+        therm = ThermometerEncoder(maximum=self.maximum, minimum=self.minimum, resolution=resolution)
+        return [np.uint8(therm.encode(x)).flatten() for x in arr]
 
-    def circular_thermometer(self, arr: np.ndarray, minimum: int = 0, maximum: int = 255, resolution: int = 20) -> list:
-        therm = CircularThermometerEncoder(maximum=maximum, minimum=minimum, resolution=resolution)
-        return [np.uint8(therm.encode(x)) for x in arr]
-
-    def sauvola(self, arr: np.ndarray, window_size: int = 11) -> list:
-        bin_imgs = list()
-        for x in arr:
-            thresh_s = threshold_sauvola(x, window_size=window_size)
-            binary_s = np.array(x > thresh_s, dtype=int)
-            bin_imgs.append(binary_s)
-        return bin_imgs
-
-    def niblack(self, arr: np.ndarray, window_size: int = 11, constant_k: float = 0.8) -> list:
-        bin_imgs = list()
-        for x in arr:
-            thresh_n = threshold_niblack(x, window_size=window_size, k=constant_k)
-            binary_n = np.array(x > thresh_n, dtype=int)
-            bin_imgs.append(binary_n)
-        return bin_imgs
-
-    def adaptive_thresh_mean(self, arr: np.ndarray, window_size: int = 11, constant_c: int = 2) -> list:
-        return [cv.adaptiveThreshold(x, 1, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, window_size, constant_c) for x in arr]
-
-    def adaptive_thresh_gaussian(self, arr: np.ndarray, window_size: int = 11, constant_c: int = 2) -> list:
-        return [cv.adaptiveThreshold(x, 1, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, window_size, constant_c) for x in arr]
+    def circular_thermometer(self, arr: np.ndarray, minimum: int = 0, maximum: int = 8, resolution: int = 20) -> list:
+        therm = CircularThermometerEncoder(maximum=self.maximum, minimum=self.minimum, resolution=resolution)
+        return [np.uint8(therm.encode(x)).flatten() for x in arr]
 
 
 def generate_train_test_dataset(
@@ -160,7 +180,8 @@ def sp_index(
     elif method == 'threshold':
         raise NotImplementedError
     else:
-        raise ValueError("Method not recognized")
+        y_true = np.array(y_true).astype(int)
+        y_pred = np.array(y_pred).astype(int)
 
     num_classes = len(np.unique(y_true))
     recall = recall_score(y_true, y_pred, average=None)

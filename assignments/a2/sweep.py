@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import wandb
 import argparse
-from assignments.a1.train import train
+from assignments.a2.train import train
 
 
 def main():
@@ -19,58 +19,40 @@ def main():
     # Check if the argument sweep is True
     if args.sweep:
         sweep_config = {
-            'method': 'bayes',
+            'method': 'grid', # bayes, grid, random 
             'name': 'sweep',
             'metric': {
-                'name': 'mean_val_acc',
+                'name': 'mean_val_sp_index',
                 'goal': 'maximize'
             },
             'parameters': {
                 'training_type': {
                     'values': ['kfold']
                 },
+                'preprocessing_lofar_spectrum_bins_left': {
+                    'values': [400, 200]
+                },
+                'data_normalization': {
+                    'values': ['mapminmax', 'mapstd']
+                },
                 'binarization_strategy': {
                     'values': [
-                        # 'basic_bin',
+                        'basic_bin',
                         'simple_thermometer',
-                        # 'circular_thermometer',
-                        # 'sauvola',
-                        # 'niblack',
-                        # 'adaptive_thresh_mean',
-                        # 'adaptive_thresh_gaussian'
+                        'circular_thermometer'
                     ]
                 },
                 'binarization_threshold': {
-                    'values': [None]
+                    'values': [-0.5, -0.25, 0, 0.25, 0.5]
                 },
                 'binarization_resolution': {
-                    'values': [
-                        20,
-                        40,
-                        50,
-                        60,
-                        70,
-                        80,
-                        90,
-                        100,
-                        110,
-                        120,
-                        130,
-                        140,
-                        150
-                    ]
+                    'values': [2 ** x for x in range(1, 5)]
                 },
                 'binarization_window_size': {
-                    'values': [None]
-                },
-                'binarization_constant_c': {
-                    'values': [None]
-                },
-                'binarization_constant_k': {
-                    'values': [None]
+                    'values': [2 ** x for x in range(1, 5)]
                 },
                 'wsd_address_size': {
-                    'values': [24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48]
+                    'values': [2 ** x for x in range(1, 8)]
                 },
                 'wsd_ignore_zero': {
                     'values': [False]
@@ -82,13 +64,13 @@ def main():
         }
         sweep_id = wandb.sweep(
             entity="viniciusdsmello",
-            project="wnn",
+            project="wnn-sonar",
             sweep=sweep_config
         )
         print("Sweep ID: ", sweep_id)
     if args.agent and args.sweep_id:
         # Run the agent
-        wandb.agent(args.sweep_id, entity='viniciusdsmello', project='wnn', function=train)
+        wandb.agent(args.sweep_id, entity='viniciusdsmello', project='wnn-sonar', function=train)
 
 
 if __name__ == '__main__':
