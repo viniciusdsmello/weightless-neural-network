@@ -13,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 
 import wandb
 from assignments.a2.sonar_utils import (generate_train_test_dataset,
-                                        preprocess_rawdata, sp_index, SonarBinarizer, scale_data)
+                                        preprocess_rawdata, sp_index, SonarBinarizer, scale_data, get_balanced_dataset)
 from model_trainer import ModelTrainer
 from utils import plot_confusion_matrix
 
@@ -60,6 +60,7 @@ def train():
         "validation_split": 0.2,
         "folds": 5,
         "data_normalization": "mapstd",
+        "data_balancing": None,
         "binarization_strategy": "circular_thermometer",
         "binarization_threshold": None, # If None, the threshold is computed using the mean value of each sample
         "binarization_resolution": 20,
@@ -110,8 +111,11 @@ def train():
             logging.info("X_test shape: %s", X_test.shape)
             logging.info("y_test shape: %s", len(y_test))
 
+            # Balance data
+            if config['data_balancing'] is not None:
+                X, y = get_balanced_dataset(X, y, config['data_balancing'])
+
             # Scale data
-            
             X, X_test = scale_data(X, X_test, config['data_normalization'])
 
             # Binaryize data
@@ -141,7 +145,6 @@ def train():
 
                 train_acc_scores = []
                 val_acc_scores = []
-
                 train_spindex_scores = []
                 val_spindex_scores = []
 
@@ -187,6 +190,11 @@ def train():
                     del y_train
                     del y_val
                     gc.collect()
+
+                run.log({"train_acc_scores": train_acc_scores})
+                run.log({"val_acc_scores": val_acc_scores})
+                run.log({"train_spindex_scores": train_spindex_scores})
+                run.log({"val_spindex_scores": val_spindex_scores})
 
                 run.log({"mean_evaluation_duration": np.mean(evaluation_durations)})
                 run.log({"std_evaluation_duration": np.std(evaluation_durations)})

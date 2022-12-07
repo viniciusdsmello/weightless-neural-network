@@ -6,6 +6,8 @@ from typing import Dict, Tuple, Union
 import cv2 as cv
 import numpy as np
 import pandas as pd
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import NearMiss
 from poseidon.io.offline import SonarDict
 from poseidon.signal.passivesonar import lofar
 from scipy.signal import decimate
@@ -15,6 +17,30 @@ from sklearn.metrics import recall_score
 from encoders import CircularThermometerEncoder, ThermometerEncoder
 from utils import Binarizer
 
+
+def get_balanced_dataset(X_data: np.ndarray, y_data: np.ndarray, strategy: str = None) -> Tuple[np.ndarray, np.ndarray]:
+    """Auxiliary function that balances dataset based on the strategy passed as arguemnt.
+    Args:
+        X_data (np.ndarray): Model's input data
+        y_data (np.ndarray): Model's target data
+        strategy (Optional[str]): Balacing strategy to use. When not passed, the returns is equal to the input.
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Balanced version of the input and its target based on the strategy passed.
+    """
+    X_data = pd.DataFrame(X_data.copy())
+    y_data = pd.DataFrame(y_data.copy())
+
+    if strategy == 'downsampling':
+        x, y = NearMiss().fit_resample(X_data, y_data)
+    elif strategy == 'oversampling':
+        # https://machinelearningmastery.com/smote-oversampling-for-imbalanced-classification/
+        x, y = SMOTE().fit_resample(X_data, y_data)
+        x = pd.DataFrame(x)
+        y = pd.DataFrame(y)
+    else:
+        x = X_data.copy().to_numpy()
+        y = y_data.copy().to_numpy()
+    return x, y
 
 def scale_data(train_data: pd.DataFrame, test_data: pd.DataFrame, scaler: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Function that applies a scaler to the data. The scaler can be either ´[minmax, standard, robust]´.

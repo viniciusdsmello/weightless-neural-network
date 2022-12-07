@@ -19,7 +19,7 @@ def main():
     # Check if the argument sweep is True
     if args.sweep:
         sweep_config = {
-            'method': 'grid', # bayes, grid, random 
+            'method': 'bayes', # bayes, grid, random 
             'name': 'sweep',
             'metric': {
                 'name': 'mean_val_sp_index',
@@ -28,6 +28,9 @@ def main():
             'parameters': {
                 'training_type': {
                     'values': ['kfold']
+                },
+                'data_balancing': {
+                    'values': [None, 'oversampling', 'undersampling']
                 },
                 'preprocessing_lofar_spectrum_bins_left': {
                     'values': [400, 200]
@@ -43,13 +46,13 @@ def main():
                     ]
                 },
                 'binarization_threshold': {
-                    'values': [-0.5, -0.25, 0, 0.25, 0.5]
+                    'values': [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75]
                 },
                 'binarization_resolution': {
-                    'values': [2 ** x for x in range(1, 5)]
+                    'values': [2 ** x for x in range(5, 9)]
                 },
                 'binarization_window_size': {
-                    'values': [2 ** x for x in range(1, 5)]
+                    'values': [2 ** x for x in range(5, 9)]
                 },
                 'wsd_address_size': {
                     'values': [2 ** x for x in range(1, 8)]
@@ -58,7 +61,7 @@ def main():
                     'values': [False]
                 },
                 'wsd_bleaching_activated': {
-                    'values': [True, False]
+                    'values': [True]
                 },
             }
         }
