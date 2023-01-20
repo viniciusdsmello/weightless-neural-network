@@ -30,35 +30,33 @@ def main():
                     'values': ['kfold']
                 },
                 'data_balancing': {
-                    'values': [None, 'oversampling', 'undersampling']
+                    'values': [None]
                 },
                 'preprocessing_lofar_spectrum_bins_left': {
                     'values': [400, 200]
                 },
                 'data_normalization': {
-                    'values': ['mapminmax', 'mapstd']
+                    'values': ['mapstd']
                 },
                 'binarization_strategy': {
                     'values': [
-                        'basic_bin',
-                        'simple_thermometer',
-                        'circular_thermometer'
+                        'simple_thermometer'
                     ]
                 },
                 'binarization_threshold': {
-                    'values': [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75]
+                    'values': [None]
                 },
                 'binarization_resolution': {
-                    'values': [2 ** x for x in range(5, 9)]
+                    'values': [2 ** x for x in range(5, 10)]
                 },
                 'binarization_window_size': {
-                    'values': [2 ** x for x in range(5, 9)]
+                    'values': [None]
                 },
                 'wsd_address_size': {
-                    'values': [2 ** x for x in range(1, 8)]
+                    'values': [2 ** x for x in range(1, 9)]
                 },
                 'wsd_ignore_zero': {
-                    'values': [False]
+                    'values': [False, True]
                 },
                 'wsd_bleaching_activated': {
                     'values': [True]

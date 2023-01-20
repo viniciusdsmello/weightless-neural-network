@@ -36,10 +36,10 @@ DATASET_CONFIG = {
     "preprocessing_filter_phase": False,
     "runs_distribution": {
         'test': {
-            'Class1': [1],
-            'Class2': [1],
-            'Class3': [1],
-            'Class4': [1]
+            'Class1': [2],
+            'Class2': [2],
+            'Class3': [2],
+            'Class4': [2]
         }
     }
 }
@@ -102,10 +102,6 @@ def train():
             X, y = development_set
             X_test, y_test = test_set
 
-            # We need to convert the target variables to str due to a limitation of the WNN implementation
-            y = y.astype(int).astype(str)
-            y_test = y_test.astype(int).astype(str)
-
             logging.info("X shape: %s", X.shape)
             logging.info("y shape: %s", len(y))
             logging.info("X_test shape: %s", X_test.shape)
@@ -117,6 +113,10 @@ def train():
 
             # Scale data
             X, X_test = scale_data(X, X_test, config['data_normalization'])
+
+            # We need to convert the target variables to str due to a limitation of the WNN implementation
+            y = y.astype(int).astype(str)
+            y_test = y_test.astype(int).astype(str)
 
             # Binaryize data
             try:

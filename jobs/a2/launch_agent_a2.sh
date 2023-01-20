@@ -13,4 +13,4 @@ singularity exec \
     --env-file $PWD/.env \
     -B $PWD:/app \
     weightless-neural-networks_latest.sif \
-    python assignments/a2/sweep.py --agent --sweep_id xc4neykc
+    python assignments/a2/sweep.py --agent --sweep_id jsgwr0hx

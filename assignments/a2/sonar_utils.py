@@ -32,11 +32,13 @@ def get_balanced_dataset(X_data: np.ndarray, y_data: np.ndarray, strategy: str =
 
     if strategy == 'downsampling':
         x, y = NearMiss().fit_resample(X_data, y_data)
+        x = pd.DataFrame(x).to_numpy()
+        y = pd.DataFrame(y).to_numpy()
     elif strategy == 'oversampling':
         # https://machinelearningmastery.com/smote-oversampling-for-imbalanced-classification/
         x, y = SMOTE().fit_resample(X_data, y_data)
-        x = pd.DataFrame(x)
-        y = pd.DataFrame(y)
+        x = pd.DataFrame(x).to_numpy()
+        y = pd.DataFrame(y).to_numpy()
     else:
         x = X_data.copy().to_numpy()
         y = y_data.copy().to_numpy()
